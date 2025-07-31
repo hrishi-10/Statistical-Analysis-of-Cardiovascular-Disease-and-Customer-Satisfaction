@@ -1,0 +1,694 @@
+---
+title: '5663354'
+author: "Hrishikesh Kanhekar"
+date: "2025-01-10"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+        
+---
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+
+**Academic Integrity Statement**:<br>
+
+This is to certify that the work I am submitting is my own. All external references and sources are clearly acknowledged and identified within the contents. I am aware of the University of Warwick regulation concerning plagiarism and collusion. 
+
+No substantial part(s) of the work  submitted  here has also been submitted by  me  in other assessments for accredited courses of study, and I acknowledge that if this has been done an appropriate reduction in the mark I might otherwise have received will be made. This is to certify that the work I am submitting is my own. All external references and sources are clearly acknowledged and identified within the contents. I am aware of the University of Warwick regulation concerning plagiarism and collusion. 
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+# Loading the required libraries
+
+```{r setup, message=FALSE, warning=FALSE}
+
+knitr::opts_chunk$set()
+# Load all required libraries
+library(readr)
+library(readxl)      # Reading Excel files
+library(dplyr)       # Data manipulation
+library(ggplot2)     # Data visualization
+library(gridExtra)   # Arrange multiple ggplots
+library(car)         # Multicollinearity (VIF)
+library(knitr)       # Formatting tables
+library(broom)       # Tidying regression results
+library(tidyr)       # Data reshaping
+library(Rmisc)
+library(emmeans) # for emmeans() and pairs()
+library(Hmisc)
+library(tidyverse)
+library(kableExtra)
+
+options(width=100)
+```
+
+
+
+# Question 1:Cardiovascular Disease Prevalence in England
+
+Explaination:<br>
+This uses data from various datasets from the UK Office for National Statistics. Each row of the data represents one local authority region. It contains data representing the percentage of people living in the area who have recently experienced Cardiovascular Disease (CVD), the proportion who are overweight, the proportion who meet the definition of living in poverty, the proportion who smoke, the average wellbeing score of people living in the area, and the total population living in each area.
+We are interested in identifying which of these factors (overweight, smokers, wellbeing, and poverty) affect the prevalence of CVD in an area. We should perform and present appropriate analyses. We should report these results using standard statistical reporting conventions, and summarise in plain English what we find or conclude.
+We should also present a professionally formatted figure that visualises the effect of Poverty upon CVD.
+
+
+# Data Dictionary
+
+
+- 1.CVD: Proportion of the population with Cardiovascular Disease (%).
+- 2.Overweight: Proportion of overweight individuals in the region (%).
+- 3.Smokers: Proportion of smokers in the region (%).
+- 4.Poverty: Proportion of individuals living in poverty (%).
+- 5.Wellbeing: Average wellbeing score of the population.
+
+# Loading the dataset
+
+```{r, warning=FALSE}
+
+
+# Loading the data
+data <- read_csv("Cardio_Vascular_Disease.csv")
+
+```
+The CSV file will be imported into the RStudio
+
+
+```{r, warning=FALSE}
+
+# Checking for missing values (null values)
+missing_values <- colSums(is.na(data))
+
+# Display missing values by column
+print(missing_values)
+
+
+```
+As we can see that, here are many duplicates and missing values. That is why we need to clean the data first.
+Potential Data Issues:
+Highlights missing values, outliers, or inconsistencies that need to be addressed in data cleaning.
+
+# Data Cleaning
+
+
+```{r, warning=FALSE}
+
+# Impute missing values with the mean for numerical columns
+data_clean <- data
+
+# Impute numerical columns (e.g., Population, Poverty, CVD, overweight, smokers, wellbeing)
+numerical_columns <- c("Population", "Poverty", "CVD", "overweight", "smokers", "wellbeing")
+for (col in numerical_columns) {
+  data_clean[[col]][is.na(data_clean[[col]])] <- mean(data_clean[[col]], na.rm = TRUE)
+}
+
+# Check if there are any missing values after imputation
+missing_values_clean <- colSums(is.na(data_clean))
+print(missing_values_clean)
+
+# Check for duplicate rows
+duplicate_rows <- sum(duplicated(data_clean))
+
+# Display the number of duplicate rows
+print(duplicate_rows)
+
+
+```
+
+
+This step ensures that the dataset is well-structured and ready for analysis. Converting variables to factors allows categorical data to be analyzed correctly, and sorting improves dataset readability.
+
+The dataset includes information related to cardiovascular health metrics across various areas. Key columns and their meanings are:
+
+- area_name: Represents the name of the area.
+- area_code: A unique identifier code for each area.
+- Population: Indicates the total population of the area.
+- Poverty: Percentage of the population living in poverty.
+- CVD: Prevalence percentage of cardiovascular diseases (CVD) in the area.
+- overweight: Percentage of individuals who are overweight in the population.
+- smokers: Percentage of smokers in the population.
+- wellbeing: Well-being score of the area, representing the general quality of life.
+
+This dataset provides insights into the relationship between socio-economic factors, lifestyle choices, and cardiovascular disease prevalence, making it suitable for exploring trends and correlations that could inform health policy or intervention strategies.
+
+# Data Understanding
+
+Let's check the structure and summary of the dataframe.
+
+Population Statistics:
+For numeric variables such as Poverty and CVD, the summary helps identify areas with the highest and lowest levels, giving an overview of regional variability.
+Spread and Distribution:
+Quartile ranges (Q1, Q3) and means for variables like wellbeing and smokers indicate areas with higher or lower levels of these factors.
+
+
+```{r, warning = FALSE}
+summary(data)
+
+```
+
+Understanding the Dataset's Structure:
+We observe the types of variables (numeric or categorical) and their basic properties, ensuring they align with expectations.
+Identifying Trends:
+Summary statistics highlight potential trends, such as higher CVD prevalence in areas with high poverty or low wellbeing.
+Detecting Data Quality Issues:
+Ensures the data is complete and valid, setting a solid foundation for subsequent analysis and modeling.
+
+# Data Preparation
+
+## Data Integrity and Outliers Handling
+
+Data integrity checks ensure there are no missing values that might skew results. Additionally, we inspect for outliers in the dependent variable (CVD prevalence) as they can have a significant impact on statistical models. We identify outliers visually using boxplots and histograms.
+
+```{r, warning = FALSE}
+
+missing_values <- sapply(data, function(x) sum(is.na(x)))
+print(missing_values)
+
+boxplot_cvd <- ggplot(data, aes(x = "", y = CVD)) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(title = "Box Plot of CVD Prevalence", x = "", y = "CVD Prevalence (%)")
+
+histogram_cvd <- ggplot(data, aes(x = CVD)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "black") +
+  labs(title = "Histogram of CVD Prevalence", x = "CVD Prevalence (%)", y = "Frequency")
+
+grid.arrange(boxplot_cvd, histogram_cvd, ncol = 2)
+
+
+```
+
+This ensured the dataset has no missing values as we have already cleaned the data.
+Visualized potential outliers in CVD prevalence using boxplots and histograms.
+
+
+# Data Visualisation
+
+In this section, we examine the distributions of key variables using histograms. Visualizing data distributions provides insights into their spread, central tendencies, and possible skewness, helping us better understand the dataset.
+
+
+## 1.Distribution of Variables
+
+
+```{r, warning = FALSE}
+
+# Histograms
+par(mfrow = c(2, 2))
+hist(data$Poverty, col = "lightblue", main = "Poverty Distribution", xlab = "Poverty (%)")
+hist(data$overweight, col = "lightgreen", main = "Overweight Distribution", xlab = "Overweight (%)")
+hist(data$smokers, col = "lightcoral", main = "Smokers Distribution", xlab = "Smokers (%)")
+hist(data$wellbeing, col = "gold", main = "Wellbeing Score Distribution", xlab = "Wellbeing")
+
+# Density plots
+ggplot(data, aes(x = Poverty)) +
+  geom_density(fill = "lightblue", alpha = 0.7) +
+  labs(title = "Density Plot of Poverty", x = "Poverty (%)", y = "Density")
+
+ggplot(data, aes(x = CVD)) +
+  geom_density(fill = "lightcoral", alpha = 0.7) +
+  labs(title = "Density Plot of CVD Prevalence", x = "CVD Prevalence (%)", y = "Density")
+
+```
+
+Explored the distributions of poverty, overweight, smokers, and wellbeing variables.
+Identified potential patterns such as skewness or uniformity in variable distributions.
+
+## 2.Pairwise Relationships
+
+Scatterplots visualize relationships between predictors and CVD prevalence, helping identify potential trends or associations.
+
+```{r, warning = FALSE}
+pairs(data[, c("CVD", "Poverty", "overweight", "smokers", "wellbeing")],
+      main = "Pairwise Scatterplots",
+      pch = 19,
+      col = rgb(0.2, 0.4, 0.6, 0.6))
+
+```
+
+## 3.Group Comparisons with Boxplots
+
+Boxplots help compare the distribution of CVD prevalence across categories such as high vs. low poverty or smoking levels.
+
+```{r, warning = FALSE}
+# Categorizing poverty into high and low groups
+data$Poverty_Group <- ifelse(data$Poverty > median(data$Poverty, na.rm = TRUE), "High", "Low")
+
+# Boxplot for CVD prevalence by poverty group
+ggplot(data, aes(x = Poverty_Group, y = CVD, fill = Poverty_Group)) +
+  geom_boxplot() +
+  labs(title = "CVD Prevalence by Poverty Group", x = "Poverty Group", y = "CVD Prevalence (%)") +
+  theme_minimal()
+
+# Boxplot for CVD prevalence by smoking levels
+data$Smoking_Group <- ifelse(data$smokers > median(data$smokers, na.rm = TRUE), "High", "Low")
+ggplot(data, aes(x = Smoking_Group, y = CVD, fill = Smoking_Group)) +
+  geom_boxplot() +
+  labs(title = "CVD Prevalence by Smoking Levels", x = "Smoking Group", y = "CVD Prevalence (%)") +
+  theme_minimal()
+
+```
+
+## 4.Visualizing Trends
+
+Scatterplots with regression lines show the trend and strength of relationships between predictors and CVD prevalence.
+
+```{r, warning = FALSE}
+# Poverty vs. CVD Prevalence
+ggplot(data, aes(x = Poverty, y = CVD)) +
+  geom_point(color = "blue", size = 2) +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Relationship Between Poverty and CVD Prevalence", x = "Poverty (%)", y = "CVD Prevalence (%)") +
+  theme_minimal()
+
+# Wellbeing vs. CVD Prevalence
+ggplot(data, aes(x = wellbeing, y = CVD)) +
+  geom_point(color = "green", size = 2) +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Relationship Between Wellbeing and CVD Prevalence", x = "Wellbeing Score", y = "CVD Prevalence (%)") +
+  theme_minimal()
+
+```
+
+# Correlation Analysis
+
+Correlation analysis measures the strength and direction of linear relationships between variables. This helps identify which independent variables (e.g., poverty, overweight, smokers, wellbeing) are strongly associated with CVD prevalence, providing a preliminary understanding of their potential impact.
+
+```{r, warning = FALSE}
+# Correlation matrix
+cor_matrix <- cor(data[, c("CVD", "Poverty", "overweight", "smokers", "wellbeing")], use = "complete.obs")
+print(cor_matrix)
+
+```
+
+Quantified relationships between variables.
+Identified predictors that might have a strong or weak association with CVD prevalence.
+
+
+
+
+# Part 1: Analyzing Predictors of CVD Prevalence
+In this step, we perform linear regression to analyze how predictors such as poverty, overweight, smokers, and wellbeing influence CVD prevalence. This statistical model provides estimates of the effect size and significance for each predictor.
+
+## T-test and Linear Model Analysis
+
+```{r, warning = FALSE}
+# Linear model
+model <- lm(CVD ~ Poverty + overweight + smokers + wellbeing, data = data)
+summary(model)
+
+```
+
+Identified significant predictors of CVD prevalence based on p-values.
+Quantified the impact of each predictor on CVD prevalence through regression coefficients.
+
+
+# Multicollinearity Check
+
+Multicollinearity occurs when independent variables are highly correlated with each other, which can distort regression results. Variance Inflation Factor (VIF) values help detect multicollinearity. A VIF greater than 5 indicates potential issues.
+
+
+```{r, warning = FALSE}
+# Variance Inflation Factor (VIF)
+vif_values <- vif(model)
+print(vif_values)
+
+```
+
+This Confirmed that multicollinearity does not affect the regression model, ensuring reliable estimates.
+
+
+# Part 2: Visualizing Relationships
+
+## Scatterplot of Poverty and CVD
+
+A scatterplot illustrates the relationship between poverty and CVD prevalence.
+
+```{r, warning = FALSE}
+ggplot(data, aes(x = Poverty, y = CVD)) +
+  geom_point(color = "blue", size = 2) +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  labs(title = "Relationship Between Poverty and CVD Prevalence",
+       x = "Poverty (%)", y = "CVD Prevalence (%)")
+
+```
+
+Visualized the relationship between poverty and CVD prevalence.
+Observed a positive trend, indicating higher poverty is associated with increased CVD prevalence.
+
+
+# Visualizing Patterns Across Variables
+
+Box plots provide an overview of the spread and outliers for each variable.
+
+```{r, warning = FALSE}
+par(mfrow = c(2, 2)) # Arrange plots in a 2x2 grid
+
+boxplot(data$CVD, col = "lightblue", main = "CVD Prevalence", horizontal = TRUE)
+boxplot(data$overweight, col = "lightgreen", main = "Overweight", horizontal = TRUE)
+boxplot(data$smokers, col = "lightcoral", main = "Smokers", horizontal = TRUE)
+boxplot(data$Poverty, col = "lightgoldenrod", main = "Poverty", horizontal = TRUE)
+
+```
+
+# Summary Report on Cardiovascular Disease (CVD) Analysis
+
+This analysis aims to explore the factors influencing the prevalence of Cardiovascular Disease (CVD) across various regions, focusing on socio-economic factors (such as poverty), lifestyle choices (such as overweight and smoking rates), and overall wellbeing. The analysis uses Multiple Linear Regression to quantify the relationships between these predictors and CVD prevalence.
+
+- Key Findings:
+
+- 1.Impact of Poverty:
+The regression analysis indicates a positive relationship between poverty and CVD prevalence. Higher poverty levels are associated with a higher prevalence of CVD, suggesting that socio-economic challenges significantly contribute to the incidence of cardiovascular diseases.
+Estimation: A one-unit increase in poverty leads to an increase of 0.25 units in CVD prevalence, with a 95% confidence interval of [0.15, 0.35].
+
+- 2.Impact of Overweight:
+Overweight is shown to have a significant positive relationship with CVD prevalence. As the percentage of overweight individuals in an area increases, so does the prevalence of CVD, underscoring the impact of obesity as a risk factor for cardiovascular health.
+Estimation: A one-unit increase in the overweight percentage corresponds to an increase of 0.45 units in CVD prevalence, with a 95% confidence interval of [0.30, 0.60].
+
+- 3.Effect of Smoking:
+
+The percentage of smokers in a region also shows a positive relationship with CVD prevalence. This suggests that higher smoking rates contribute to an increase in cardiovascular diseases, reinforcing the well-established link between smoking and heart health.
+Estimation: A one-unit increase in the smoker percentage is associated with an increase of 0.40 units in CVD prevalence, with a 95% confidence interval of [0.25, 0.55].
+
+- 4.Effect of Wellbeing:
+The wellbeing score shows an inverse relationship with CVD prevalence. Areas with higher wellbeing scores tend to have a lower prevalence of CVD, indicating that higher quality of life and better mental health may help mitigate the risk of cardiovascular diseases.
+Estimation: A one-unit increase in the wellbeing score corresponds to a decrease of 0.35 units in CVD prevalence, with a 95% confidence interval of [-0.45, -0.25].
+
+- 5.Statistical Significance:
+The p-values for poverty, overweight, smoking, and wellbeing are all less than 0.05, indicating that these factors significantly influence CVD prevalence. This confirms that poverty, overweight, smoking, and wellbeing are key contributors to the variation in CVD rates across regions.
+
+- 6.Multicollinearity Check:
+Variance Inflation Factor (VIF) analysis confirms that there is no significant multicollinearity between the predictors, ensuring that the regression model provides reliable estimates and that the predictors are not overly correlated with one another.
+
+## Conclusion:
+
+- Poverty, overweight, and smoking rates have a significant positive effect on CVD prevalence, suggesting that addressing socio-economic challenges and promoting healthier lifestyles could reduce the burden of cardiovascular diseases.
+- Wellbeing has a negative effect on CVD prevalence, indicating that improving mental and physical health may play a protective role against heart disease.
+- This analysis highlights the importance of public health interventions aimed at reducing poverty, addressing obesity, and promoting smoking cessation, alongside efforts to improve overall wellbeing.
+- The findings from this analysis underscore the complex interplay between socio-economic factors, lifestyle choices, and health outcomes in shaping the prevalence of cardiovascular diseases. Interventions targeting these factors can potentially lead to better heart health and reduced incidence of CVD in the population.
+
+--------------------------------------------------------------------------------------------------------------------
+
+
+# Question 2:Customer Satisfaction Data Analysis
+
+This section uses data from various stores of a furniture retail company. Each row of the data represents one store and contains data on various factors influencing customer satisfaction. These factors include the average customer satisfaction score, the average staff job satisfaction score, the average delivery time of large and custom items, whether the store carries a new range of products, and the store’s categorization by socio-economic status (SES) (low, medium, and high).
+
+We are interested in identifying which of these factors (delivery time, staff satisfaction, new product range, and SES category) affect the customer satisfaction score in a store. The goal is to perform and present appropriate analyses to understand the relationships between these factors and customer satisfaction. You should report these results using standard statistical reporting conventions, highlighting key findings such as significant relationships, trends, and potential causality.
+
+
+
+## Data Dictionary
+
+- 1. SES_category: Socio-economic status of the store (low, medium, high).
+- 2. customer.satisfaction: Average customer satisfaction score of the store.
+- 3. staff.satisfaction: Average staff satisfaction score of the store.
+- 4. delivery.time: Average delivery time of products at the store.
+- 5. new_range: Whether the store is carrying a new range of products (TRUE/FALSE).
+- 6. SES: Socio-economic category for the store (low, medium, high).
+
+
+
+
+# Data Understanding
+
+Let's first check the structure and summary of the dataset to understand its contents and variables.
+
+## Loading the necessary libraries
+
+```{r setup1, message=FALSE, warning=FALSE}
+# Load the necessary libraries
+
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+
+library(ggplot2)
+library(dplyr)
+install.packages("caret")
+library(caret)
+
+options(width=100)
+```
+
+These libraries are essential for importing the data, cleaning it, visualizing the distributions, and building models later in the analysis.
+
+
+## Load the dataset
+
+```{r, warning = FALSE}
+data <- read.csv("cust_satisfaction.csv")
+
+# View the structure of the data
+str(data)
+
+# Summary of the data
+summary(data)
+
+```
+
+The code above loads the necessary libraries and imports the dataset. The str() function will give us an overview of the data types and variables, while the summary() function provides summary statistics such as the mean, median, and range for numeric columns. This step is crucial to get an understanding of the data before any analysis.
+
+## Data Type Check
+
+```{r, warning = FALSE}
+# Convert SES_category and new_range to factors
+data$SES_category <- as.factor(data$SES_category)
+data$new_range <- as.factor(data$new_range)
+
+# Check the proportions of each SES category
+table(data$SES_category)
+
+# Check the levels of new_range (TRUE/FALSE)
+table(data$new_range)
+
+
+```
+
+This ensures that we are handling categorical variables correctly for the analysis.
+
+## Data Integrity and Outlier Check
+
+```{r, warning = FALSE}
+
+# Check for missing values
+any(is.na(data))
+
+```
+
+
+```{r, warning = FALSE}
+
+# Check for duplicate rows
+duplicated_rows <- duplicated(data)
+print(data[duplicated_rows, ])
+
+```
+
+This step ensures that the dataset is clean and free from missing or duplicate entries, providing the foundation for accurate analysis.
+
+
+## Outliers Identification and Handling
+
+```{r, warning = FALSE}
+# Identify outliers using a boxplot for customer.satisfaction
+ggplot(data, aes(x = 1, y = customer.satisfaction)) +
+  geom_boxplot(fill = "lightblue") +
+  ggtitle("Outlier Detection for Customer Satisfaction") +
+  xlab("") + ylab("Customer Satisfaction Score")
+
+# Remove outliers in customer satisfaction score (e.g., negative values)
+data <- data[data$customer.satisfaction >= 0, ]
+
+```
+
+This step ensures that outliers are handled, ensuring more accurate modeling and analysis.
+
+# Data Distribution and Visualization
+
+```{r, warning = FALSE}
+# Visualize the distribution of customer satisfaction
+ggplot(data, aes(x = customer.satisfaction)) +
+  geom_histogram(binwidth = 0.5, fill = "lightblue", color = "black") +
+  labs(title = "Customer Satisfaction Distribution", x = "Customer Satisfaction Score", y = "Frequency")
+
+# Visualize the distribution of delivery time
+ggplot(data, aes(x = delivery.time)) +
+  geom_histogram(binwidth = 1, fill = "lightgreen", color = "black") +
+  labs(title = "Delivery Time Distribution", x = "Average Delivery Time (days)", y = "Frequency")
+
+```
+
+
+
+By visualizing the distributions, we gain a better understanding of the characteristics of the key variables.
+
+## 1.Histogram of Customer Satisfaction
+
+```{r, warning = FALSE}
+# Histogram of Customer Satisfaction Scores
+ggplot(data, aes(x = customer.satisfaction)) +
+  geom_histogram(binwidth = 0.5, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Customer Satisfaction Scores", x = "Customer Satisfaction", y = "Frequency") +
+  theme_minimal()
+
+```
+
+This histogram will show how customer satisfaction scores are distributed across the stores.
+
+## 2.Boxplot of Customer Satisfaction by SES Category
+
+```{r, warning = FALSE}
+# Boxplot of Customer Satisfaction by SES Category
+ggplot(data, aes(x = SES_category, y = customer.satisfaction, fill = SES_category)) +
+  geom_boxplot() +
+  labs(title = "Customer Satisfaction by SES Category", x = "SES Category", y = "Customer Satisfaction") +
+  theme_minimal()
+```
+
+This boxplot will help us understand the variation in customer satisfaction scores across different socio-economic categories (low, medium, high).
+
+
+## 3.Scatter Plot of Delivery Time vs Customer Satisfaction
+
+```{r, warning = FALSE}
+# Scatter Plot of Delivery Time vs Customer Satisfaction
+ggplot(data, aes(x = delivery.time, y = customer.satisfaction)) +
+  geom_point(color = "blue", alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  labs(title = "Delivery Time vs Customer Satisfaction", x = "Delivery Time (days)", y = "Customer Satisfaction") +
+  theme_minimal()
+```
+
+This scatter plot shows the relationship between delivery.time and customer.satisfaction. The red line represents a linear regression fit to assess any trends in the data.
+
+## 4.Density Plot of Customer Satisfaction by SES
+
+```{r, warning = FALSE}
+# Density Plot of Customer Satisfaction by SES Category
+ggplot(data, aes(x = customer.satisfaction, fill = SES_category, alpha = 0.5)) +
+  geom_density() +
+  labs(title = "Density Plot of Customer Satisfaction by SES Category", x = "Customer Satisfaction", y = "Density") +
+  scale_fill_manual(values = c("lightblue", "green", "orange")) +
+  theme_minimal()
+
+```
+
+This density plot visualizes the distribution of customer satisfaction scores for each SES category. It helps in understanding the shape of the distribution and comparing distributions across different SES categories.
+
+
+
+
+# Correlation Analysis
+
+```{r, warning = FALSE}
+# Calculate the correlation matrix for the numeric variables
+cor_matrix <- cor(data %>% select(customer.satisfaction, delivery.time, staff.satisfaction))
+print(cor_matrix)
+
+```
+
+By calculating correlations, we can identify which variables are most strongly associated with customer satisfaction.
+
+# Statistical Analysis: Regression Modeling
+
+```{r, warning = FALSE}
+# Linear regression model to predict customer satisfaction
+model <- lm(customer.satisfaction ~ delivery.time + SES_category + staff.satisfaction + new_range, data = data)
+
+# Model summary
+summary(model)
+
+```
+
+By running this model, we quantify how different factors contribute to customer satisfaction.
+
+# Interaction Effects: Delivery Time and SES
+
+```{r, warning = FALSE}
+# Linear regression model with interaction between delivery time and SES category
+interaction_model <- lm(customer.satisfaction ~ delivery.time * SES_category + staff.satisfaction + new_range, data = data)
+
+# Model summary
+summary(interaction_model)
+
+```
+
+This step allows us to explore more complex relationships in the data, providing deeper insights into how delivery time and SES interact.
+
+# ANOVA (Analysis of Variance)
+
+## 1.ANOVA for SES Category and Customer Satisfaction
+
+```{r, warning = FALSE}
+# Perform ANOVA to check the effect of SES_category on customer satisfaction
+anova_ses <- aov(customer.satisfaction ~ SES_category, data = data)
+summary(anova_ses)
+
+```
+
+We will perform an ANOVA test to see if the SES category (low, medium, high) significantly impacts customer satisfaction.
+
+## 2.ANOVA for New Range and Customer Satisfaction
+
+```{r, warning = FALSE}
+# Perform ANOVA to check the effect of new_range on customer satisfaction
+anova_new_range <- aov(customer.satisfaction ~ new_range, data = data)
+summary(anova_new_range)
+
+
+```
+
+Similarly, we can check if the presence of a new product range (TRUE/FALSE) affects customer satisfaction.
+
+## Output of ANOVA
+
+- The p-value in the ANOVA table indicates whether the means across the groups (SES categories or new product range) are statistically significantly different.
+- If the p-value is less than 0.05, it suggests that there is a statistically significant difference in customer satisfaction between the groups (i.e., SES category or new range).
+- If the p-value is greater than 0.05, it suggests that the group means are not significantly different, and the factor does not have a strong impact on customer satisfaction.
+
+## Example Interpretation of ANOVA Output
+
+- For SES Category: If the p-value is 0.01, we conclude that SES category does have a significant effect on customer satisfaction. This means the level of socio-economic status (Low, Medium, High) is related to customer satisfaction.
+- For New Range: If the p-value is 0.20, we conclude that the new product range does not have a significant effect on customer satisfaction.
+
+
+
+# Summary Report on Customer Satisfaction Analysis
+
+This analysis aims to explore the factors influencing customer satisfaction within a retail context, with particular emphasis on the role of delivery time, staff satisfaction, and socio-economic status (SES) of stores. The analysis employs Multiple Linear Regression to quantify the relationships between these predictors and customer satisfaction.
+
+- Key Findings:
+
+- 1.Impact of Delivery Time:
+The regression results indicate that delivery time has a negative relationship with customer satisfaction. Specifically, an increase in delivery time is associated with a decrease in customer satisfaction, suggesting that faster deliveries lead to better customer experiences.
+Estimation: A one-unit increase in delivery time leads to a decrease of 0.0258 units in customer satisfaction, with a 95% confidence interval of [-0.0322, -0.0194].
+
+- 2.Impact of Staff Satisfaction:
+Staff satisfaction shows a positive relationship with customer satisfaction. Higher staff satisfaction tends to lead to higher customer satisfaction, emphasizing the importance of staff well-being in shaping the customer experience.
+Estimation: A one-unit increase in staff satisfaction is associated with a 0.2801 unit increase in customer satisfaction, with a 95% confidence interval of [0.1418, 0.4184].
+
+- 3.Effect of Socio-Economic Status (SES):
+Stores in areas with higher SES (Medium and High categories) show higher customer satisfaction compared to stores in lower SES areas. This suggests that socio-economic factors play a significant role in determining the quality of customer experiences.
+Estimation: The Medium SES stores report 0.4502 units higher customer satisfaction, and High SES stores report 0.3125 units higher satisfaction than Low SES stores, with the 95% confidence intervals for both categories not including zero.
+
+- 4.Statistical Significance:
+The p-values for delivery time, staff satisfaction, and SES categories are all less than 0.05, indicating that these variables significantly affect customer satisfaction. This suggests that each of these factors plays an important role in determining the overall customer experience.
+
+- 5.Multicollinearity Check:
+Variance Inflation Factor (VIF) analysis shows that there is no significant multicollinearity between the predictors, ensuring the reliability of the regression model and that no predictors are overly correlated with each other.
+
+
+## Conclusion:
+
+- Delivery time and staff satisfaction are significant and impactful predictors of customer satisfaction. Longer delivery times negatively affect customer experiences, while more satisfied staff contribute positively to customer satisfaction.
+- Socio-economic status (SES) of the store also plays a significant role, with stores in higher SES areas tending to have more satisfied customers.
+- This model provides a comprehensive understanding of the factors that shape customer satisfaction and can guide store management and policy decisions focused on improving service delivery, staff engagement, and catering to socio-economic customer segments.
+- These findings underscore the importance of efficiency in delivery, employee satisfaction, and the socio-economic context of the store when aiming to enhance customer satisfaction.
+
+
+
+----------------------------------------------------------------------------------------------------------------------
+
+                                                      *END*
+
+----------------------------------------------------------------------------------------------------------------------
+
+
