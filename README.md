@@ -32,6 +32,25 @@ The goal is to identify significant predictors in both datasets, perform hypothe
 - Visualizations are formatted for professional presentation.
 - The written content is concise and focused, tailored to an audience with expertise in R, tidyverse, and statistics.
 
+## Outcomes
+
+### Question 1 – Cardiovascular Disease (CVD) in England
+
+- Identify which factors among overweight population, smoking rates, poverty levels, and wellbeing scores significantly influence the prevalence of CVD in local authority regions.
+- Quantify the strength and direction of these relationships using appropriate statistical models (e.g., multiple linear regression).
+- Provide clear interpretation of statistical tests (NHST) and estimation (confidence intervals).
+- Deliver a professionally formatted visualization illustrating the effect of poverty on CVD prevalence.
+- Draw evidence-based conclusions that inform public health understanding and policy implications.
+
+### Question 2 – Customer Satisfaction in Furniture Retail
+
+- Assess the impact of staff job satisfaction, delivery times (large and custom items), new product range presence, and socio-economic status (SES) of store location on overall customer satisfaction.
+- Explore whether the relationship between delivery times and customer satisfaction differs across stores classified as high, medium, or low SES.
+- Use interaction terms and stratified analysis to capture differences in effect by SES.
+- Present hypothesis testing results and effect size estimates with clear interpretation.
+- Produce a professional figure visualizing the delivery time effect pattern by SES.
+- Provide actionable insights for the company to improve customer satisfaction and operational strategies.
+
 ## Author
 
 Hrishikesh
